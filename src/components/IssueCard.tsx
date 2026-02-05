@@ -55,15 +55,15 @@ export function IssueCard({ issue, onUpvote }: IssueCardProps) {
         {/* Content */}
         <div className="flex-1 p-4 flex flex-col">
           <div className="flex items-start justify-between gap-2 mb-2">
-            <h3 className="font-heading font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-2">
-              {issue.title}
-            </h3>
+           <h3 className="font-heading font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-2">
+               {CATEGORY_CONFIG[issue.category].label}
+             </h3>
             <Badge className={`${statusConfig.className} status-badge flex-shrink-0`}>
               {statusConfig.label}
             </Badge>
           </div>
 
-          <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+           <p className="text-sm text-muted-foreground line-clamp-3 mb-3">
             {issue.description}
           </p>
 

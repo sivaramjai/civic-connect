@@ -1,4 +1,4 @@
-import { useState } from 'react';
+ import { useState, useRef } from 'react';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { Button } from '@/components/ui/button';
@@ -18,19 +18,22 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
+ import { useNavigate } from 'react-router-dom';
+ import { useIssues } from '@/contexts/IssueContext';
 
-const ReportIssue = () => {
-  const { toast } = useToast();
-  const navigate = useNavigate();
-  
-  const [category, setCategory] = useState<IssueCategory | undefined>();
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [address, setAddress] = useState('');
-  const [images, setImages] = useState<string[]>([]);
-  const [isLocating, setIsLocating] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+ const ReportIssue = () => {
+   const { toast } = useToast();
+   const navigate = useNavigate();
+   const { addIssue } = useIssues();
+   const fileInputRef = useRef<HTMLInputElement>(null);
+   
+   const [category, setCategory] = useState<IssueCategory | undefined>();
+   const [description, setDescription] = useState('');
+   const [address, setAddress] = useState('');
+   const [imageFiles, setImageFiles] = useState<File[]>([]);
+   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+   const [isLocating, setIsLocating] = useState(false);
+   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleGetLocation = () => {
     setIsLocating(true);
@@ -45,40 +48,90 @@ const ReportIssue = () => {
     }, 1500);
   };
 
-  const handleImageUpload = () => {
-    // Simulate image upload
-    const placeholderImages = ['/placeholder.svg'];
-    setImages([...images, ...placeholderImages]);
+   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+     const files = e.target.files;
+     if (!files) return;
+     
+     const newFiles: File[] = [];
+     const newPreviews: string[] = [];
+     
+     Array.from(files).forEach((file) => {
+       if (imageFiles.length + newFiles.length >= 4) return;
+       
+       // Validate file type
+       if (!file.type.match(/^image\/(jpeg|jpg|png)$/i)) {
+         toast({
+           title: 'Invalid file type',
+           description: 'Please upload JPG or PNG images only.',
+           variant: 'destructive',
+         });
+         return;
+       }
+       
+       newFiles.push(file);
+       newPreviews.push(URL.createObjectURL(file));
+     });
+     
+     setImageFiles(prev => [...prev, ...newFiles]);
+     setImagePreviews(prev => [...prev, ...newPreviews]);
+     
+     // Reset file input
+     if (fileInputRef.current) {
+       fileInputRef.current.value = '';
+     }
+   };
+ 
+   const openFilePicker = () => {
+     fileInputRef.current?.click();
   };
 
   const removeImage = (index: number) => {
-    setImages(images.filter((_, i) => i !== index));
+     // Revoke object URL to prevent memory leak
+     URL.revokeObjectURL(imagePreviews[index]);
+     setImageFiles(prev => prev.filter((_, i) => i !== index));
+     setImagePreviews(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!category || !title || !description || !address) {
-      toast({
-        title: 'Missing information',
-        description: 'Please fill in all required fields.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-    
-    // Simulate submission
-    setTimeout(() => {
-      setIsSubmitting(false);
-      toast({
-        title: 'Issue reported successfully!',
-        description: 'Your report has been submitted and will be reviewed shortly.',
-      });
-      navigate('/issues');
-    }, 2000);
-  };
+ const handleSubmit = (e: React.FormEvent) => {
+     e.preventDefault();
+     
+     if (!category || !description || !address) {
+       toast({
+         title: 'Missing information',
+         description: 'Please fill in all required fields.',
+         variant: 'destructive',
+       });
+       return;
+     }
+ 
+     setIsSubmitting(true);
+     
+     // Add the issue to shared state
+     addIssue({
+       title: description.slice(0, 50) + (description.length > 50 ? '...' : ''), // Use description as title
+       description,
+       category,
+       status: 'reported',
+       priority: 'medium',
+       location: {
+         address,
+         lat: 0,
+         lng: 0,
+       },
+       images: imagePreviews, // Use local preview URLs for now
+       reportedBy: {
+         id: 'anonymous',
+         name: 'Anonymous Citizen',
+       },
+     });
+     
+     setIsSubmitting(false);
+     toast({
+       title: 'Issue reported successfully!',
+       description: 'Your report has been submitted and will be reviewed shortly.',
+     });
+     navigate('/issues');
+   };
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -110,29 +163,17 @@ const ReportIssue = () => {
               </CardContent>
             </Card>
 
-            {/* Issue Details */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-heading flex items-center gap-2">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary text-sm font-bold">2</span>
-                  Issue Details
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="title">Title *</Label>
-                  <Input
-                    id="title"
-                    placeholder="Brief description of the issue"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    maxLength={100}
-                  />
-                  <p className="text-xs text-muted-foreground text-right">{title.length}/100</p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="description">Detailed Description *</Label>
+             {/* Issue Details */}
+             <Card>
+               <CardHeader>
+                 <CardTitle className="font-heading flex items-center gap-2">
+                   <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary text-sm font-bold">2</span>
+                   Describe the Issue
+                 </CardTitle>
+               </CardHeader>
+               <CardContent className="space-y-4">
+                 <div className="space-y-2">
+                   <Label htmlFor="description">Description *</Label>
                   <Textarea
                     id="description"
                     placeholder="Provide more details about the issue, including when you noticed it and any safety concerns..."
@@ -191,17 +232,27 @@ const ReportIssue = () => {
               </CardContent>
             </Card>
 
-            {/* Photos */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-heading flex items-center gap-2">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary text-sm font-bold">4</span>
-                  Add Photos (Optional)
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {images.map((img, index) => (
+             {/* Photos */}
+             <Card>
+               <CardHeader>
+                 <CardTitle className="font-heading flex items-center gap-2">
+                   <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary text-sm font-bold">4</span>
+                   Add Photos (Optional)
+                 </CardTitle>
+               </CardHeader>
+               <CardContent className="space-y-4">
+                 {/* Hidden file input */}
+                 <input
+                   ref={fileInputRef}
+                   type="file"
+                   accept="image/jpeg,image/jpg,image/png"
+                   multiple
+                   onChange={handleImageUpload}
+                   className="hidden"
+                 />
+                 
+                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                   {imagePreviews.map((img, index) => (
                     <div key={index} className="relative group aspect-square rounded-lg overflow-hidden bg-muted">
                       <img src={img} alt={`Upload ${index + 1}`} className="w-full h-full object-cover" />
                       <button
@@ -214,10 +265,10 @@ const ReportIssue = () => {
                     </div>
                   ))}
                   
-                  {images.length < 4 && (
+                   {imagePreviews.length < 4 && (
                     <button
                       type="button"
-                      onClick={handleImageUpload}
+                       onClick={openFilePicker}
                       className="aspect-square rounded-lg border-2 border-dashed border-border hover:border-primary/50 hover:bg-muted/50 transition-colors flex flex-col items-center justify-center gap-2"
                     >
                       <Camera className="h-6 w-6 text-muted-foreground" />

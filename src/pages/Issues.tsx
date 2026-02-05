@@ -4,7 +4,7 @@ import { Footer } from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { IssueCard } from '@/components/IssueCard';
-import { mockIssues } from '@/lib/mockData';
+ import { useIssues } from '@/contexts/IssueContext';
 import { IssueStatus, IssueCategory, CATEGORY_CONFIG, STATUS_CONFIG } from '@/lib/types';
 import { Search, Filter, SlidersHorizontal, MapPin, LayoutGrid, List } from 'lucide-react';
 import {
@@ -22,7 +22,9 @@ const Issues = () => {
   const [sortBy, setSortBy] = useState('recent');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
-  const filteredIssues = mockIssues.filter((issue) => {
+   const { issues, upvoteIssue } = useIssues();
+ 
+   const filteredIssues = issues.filter((issue) => {
     const matchesSearch = issue.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       issue.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       issue.location.address.toLowerCase().includes(searchQuery.toLowerCase());
@@ -44,10 +46,9 @@ const Issues = () => {
     }
   });
 
-  const handleUpvote = (id: string) => {
-    // Would update state in real app
-    console.log('Upvoting issue:', id);
-  };
+ const handleUpvote = (id: string) => {
+     upvoteIssue(id);
+   };
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -149,33 +150,48 @@ const Issues = () => {
             </Button>
           </div>
 
-          {/* Issues List */}
-          {filteredIssues.length > 0 ? (
-            <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-4' : 'space-y-4'}>
-              {filteredIssues.map((issue) => (
-                <IssueCard key={issue.id} issue={issue} onUpvote={handleUpvote} />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-16">
-              <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-                <Search className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <h3 className="font-heading font-semibold text-lg text-foreground mb-2">
-                No issues found
-              </h3>
-              <p className="text-muted-foreground mb-4">
-                Try adjusting your filters or search terms.
-              </p>
-              <Button variant="outline" onClick={() => {
-                setSearchQuery('');
-                setStatusFilter('all');
-                setCategoryFilter('all');
-              }}>
-                Clear Filters
-              </Button>
-            </div>
-          )}
+           {/* Issues List */}
+           {issues.length === 0 ? (
+             <div className="text-center py-16">
+               <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                 <MapPin className="h-8 w-8 text-muted-foreground" />
+               </div>
+               <h3 className="font-heading font-semibold text-lg text-foreground mb-2">
+                 No issues reported yet
+               </h3>
+               <p className="text-muted-foreground mb-4">
+                 Be the first to report a civic issue in your community.
+               </p>
+               <Button variant="default" onClick={() => window.location.href = '/report'}>
+                 Report an Issue
+               </Button>
+             </div>
+           ) : filteredIssues.length > 0 ? (
+             <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-4' : 'space-y-4'}>
+               {filteredIssues.map((issue) => (
+                 <IssueCard key={issue.id} issue={issue} onUpvote={handleUpvote} />
+               ))}
+             </div>
+           ) : (
+             <div className="text-center py-16">
+               <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                 <Search className="h-8 w-8 text-muted-foreground" />
+               </div>
+               <h3 className="font-heading font-semibold text-lg text-foreground mb-2">
+                 No matching issues
+               </h3>
+               <p className="text-muted-foreground mb-4">
+                 Try adjusting your filters or search terms.
+               </p>
+               <Button variant="outline" onClick={() => {
+                 setSearchQuery('');
+                 setStatusFilter('all');
+                 setCategoryFilter('all');
+               }}>
+                 Clear Filters
+               </Button>
+             </div>
+           )}
         </div>
       </main>
 
